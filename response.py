@@ -1,5 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 import streamlit as st
+from models_config import MODEL_CONFIG
 
 
 def generate_response(context, query, chat_history, model_name, temperature):
@@ -8,7 +10,11 @@ def generate_response(context, query, chat_history, model_name, temperature):
     Returns:
         str: The LLM-generated response as a string, or None if an error occurs.
     """
-    model = ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
+    provider = MODEL_CONFIG.get(model_name)
+    if provider == "groq":
+        model = ChatGroq(model=model_name, temperature=temperature)
+    else:
+        model = ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
 
     # Format the prompt to include context and chat history (if any)
     prompt = (

@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import streamlit as st
 from search import search_and_scrape
 from response import generate_response
+from models_config import MODEL_CONFIG, MODEL_NAMES  # Import model config and names
 
 load_dotenv()
 
@@ -9,15 +10,9 @@ load_dotenv()
 def main():
     st.title("Deep Search Q&A App")
 
-    # Initialize session state
-    if "scraped_data" not in st.session_state:
-        st.session_state["scraped_data"] = []
-    if "scraped_urls" not in st.session_state:
-        st.session_state["scraped_urls"] = []
-    if "chat_history" not in st.session_state:
-        st.session_state["chat_history"] = (
-            ""  # Initialize an empty string for chat history
-        )
+    # Initialize session state using a loop
+    for key in ["scraped_data", "scraped_urls", "chat_history"]:
+        st.session_state.setdefault(key, [])
 
     # Step 1: Search and Scrape
     with st.form("search_form"):
@@ -56,16 +51,10 @@ def main():
             else:
                 st.error("Please enter a search query.")
 
-    # Model selection
-    model_name = st.selectbox(
-        "Select model:",
-        [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-lite-preview-02-05",
-            "gemini-2.0-pro-exp-02-05",
-            "gemini-2.0-flash-thinking-exp-01-21",
-        ],
-    )
+    # Model selection with provider names
+    model_options = [f"{name} ({MODEL_CONFIG[name]})" for name in MODEL_NAMES]
+    selected_model_option = st.selectbox("Select model:", model_options)
+    model_name = selected_model_option.split(" (")[0]  # Extract model name
 
     # Temperature selection
     temperature = st.slider(
@@ -77,13 +66,23 @@ def main():
     with st.form("qa_form"):
         question = st.text_input("Ask a question about the scraped data:")
         include_chat_history = st.toggle("Include Chat History", value=False)
+
+        if include_chat_history:
+            recent_queries_count = st.number_input(
+                "Number of recent queries to include:", min_value=1, value=100
+            )
+        else:
+            recent_queries_count = 0
+
         qa_submitted = st.form_submit_button("Ask")
 
         if qa_submitted:
             if question and st.session_state["scraped_data"]:
                 with st.spinner("Generating answer..."):
                     chat_history_input = (
-                        st.session_state["chat_history"] if include_chat_history else ""
+                        st.session_state["chat_history"][-recent_queries_count:]
+                        if include_chat_history
+                        else ""
                     )
                     # Get the LLM response
                     response = generate_response(
@@ -98,9 +97,9 @@ def main():
                         st.info(response)
 
                         # Update chat history
-                        st.session_state[
-                            "chat_history"
-                        ] += f"\nUser: {question}\nAssistant: {response}"
+                        st.session_state["chat_history"].append(
+                            f"User: {question}\nAssistant: {response}"
+                        )
                     else:
                         st.error(
                             "Failed to generate a response.  Check your LLM configuration."
@@ -114,7 +113,7 @@ def main():
     # Display Chat History
     if st.session_state["chat_history"]:
         with st.expander("Show Chat History"):
-            st.markdown(st.session_state["chat_history"])
+            st.markdown("\n\n".join(st.session_state["chat_history"]))
 
 
 if __name__ == "__main__":
