@@ -33,9 +33,14 @@ This project enables users to perform comprehensive web searches and scrape mark
      ```
      uv install -r requirements.txt
      ```
-3. **Environment Variables**: Create a `.env` file at the project root with the following:
-   - **FIRECRAWL_API_KEY**: Your Firecrawl API key.
-   - **GOOGLE_API_KEY**: Your Google API key.
+3. **Environment Variables**:
+   - Copy the example file:
+     ```
+     cp .env.example .env
+     ```
+   - Then update the following variables in `.env`:
+     - **FIRECRAWL_API_KEY**: Your Firecrawl API key.
+     - **GOOGLE_API_KEY**: Your Google API key.
 
 ## Configuration
 - **LLM Models**: See the list of available models in `app.py` and modify as required.
