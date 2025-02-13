@@ -1,68 +1,13 @@
-from firecrawl import FirecrawlApp
 from dotenv import load_dotenv
 import streamlit as st
-from langchain_google_genai import ChatGoogleGenerativeAI
+from search import search_and_scrape
+from response import generate_response
 
 load_dotenv()
 
 
-def search_and_scrape(query, top_k) -> str:
-    """Searches using Firecrawl and scrapes markdown content.
-
-    Returns:
-        str: A string containing all the scraped markdown content concatenated,
-             or an empty string if scraping fails.
-    """
-    app = FirecrawlApp()
-    try:
-        result = app.search(
-            query,
-            params={
-                "limit": top_k,
-                "scrapeOptions": {
-                    "formats": ["markdown"],
-                },
-            },
-        )
-        if result and result["success"]:
-            urls = [item["url"] for item in result["data"]]
-            return result["data"], urls
-        else:
-            st.warning(
-                f"Search was not successful: {result.get('error', 'Unknown error')}"
-            )
-            return [], []
-    except Exception as e:
-        st.error(f"Error during search and scraping: {e}")
-        return [], []
-
-
-def generate_response(context, query, chat_history, model_name, temperature):
-    """Generates response from LLM based on provided context and query.
-
-    Returns:
-        str: The LLM-generated response as a string, or None if an error occurs.
-    """
-    model = ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
-
-    # Format the prompt to include context and chat history (if any)
-    prompt = (
-        f"Context:\n{context}\n\nChat History:\n{chat_history}\n\nUser Query: {query}"
-    )
-
-    try:
-        response = model.invoke(prompt)
-        return response.content  # Return only the text content
-    except Exception as e:
-        st.error(f"Error during LLM generation: {e}")
-        return None
-
-
 def main():
-    st.title("🦜🔗 Firecrawl Q&A App")
-
-    # Sidebar for feature selection
-    # feature = st.sidebar.radio("Choose a feature:", ("Search and Scrape", "Q&A"))
+    st.title("Deep Search Q&A App")
 
     # Initialize session state
     if "scraped_data" not in st.session_state:
@@ -80,17 +25,21 @@ def main():
         top_k = st.number_input(
             "Enter top_k (number of results to scrape):",
             min_value=1,
-            value=10,
+            value=20,
         )
+        retain_data = st.toggle("Retain previous search data", value=True)
         search_submitted = st.form_submit_button("Search and Scrape")
 
         if search_submitted:
             if search_query:
                 with st.spinner("Searching and scraping..."):
-                    (
-                        st.session_state["scraped_data"],
-                        st.session_state["scraped_urls"],
-                    ) = search_and_scrape(search_query, top_k)
+                    new_data, new_urls = search_and_scrape(search_query, top_k)
+                    if retain_data:
+                        st.session_state["scraped_data"].extend(new_data)
+                        st.session_state["scraped_urls"].extend(new_urls)
+                    else:
+                        st.session_state["scraped_data"] = new_data
+                        st.session_state["scraped_urls"] = new_urls
 
                 if st.session_state["scraped_data"]:
                     st.success("Successfully scraped data!")
@@ -127,8 +76,8 @@ def main():
     st.subheader("Q&A")
     with st.form("qa_form"):
         question = st.text_input("Ask a question about the scraped data:")
+        include_chat_history = st.toggle("Include Chat History", value=False)
         qa_submitted = st.form_submit_button("Ask")
-        include_chat_history = st.checkbox("Include Chat History", value=False)
 
         if qa_submitted:
             if question and st.session_state["scraped_data"]:
